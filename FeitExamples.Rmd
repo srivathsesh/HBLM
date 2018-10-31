@@ -1,0 +1,45 @@
+---
+title: "HLM models for conjoint analysis"
+output: html_notebook
+---
+The code from Chapter 9 of Chapman and Feit are reproduced here... The goal is to learn the output of HLM models
+
+```{r,message=F}
+library(dplyr)
+library(magrittr)
+conjoint.df <- read.csv("http://goo.gl/G8knGV")
+# inspect the data frame
+skimr::skim(conjoint.df)
+
+```
+
+Rating is continuous variable the rest of the integer type variables are categorical (Ignoring resp.id).
+
+```{r}
+conjoint.df %<>% 
+  mutate(height = as.factor(height),
+         speed = as.factor(speed)) %>% 
+  as_tibble(.)
+
+# number of respondents
+conjoint.df %>% distinct(resp.id) %>% summarise(N = n()) -> N
+```
+
+There are `r N` respondents in this study
+
+```{r}
+lattice::histogram(~rating|height,data = conjoint.df)
+```
+
+# Linear model
+
+```{r}
+ride.lm <- lm(rating ~ . - resp.id, data = conjoint.df)
+summary(ride.lm)
+plot(ride.lm)
+```
+
+The most desired coaster based on the coefficients is Speed of 70, height 300, const of steel and Dragon themed
+The sum of the coefficents 3.07307 + 4.48697 +  2.94551 exceed the max rating of 10. 
+
+Interpretting the model based on the averages that include the desireable and undesirable effects may be misleading at the extremes. So, what do we do?

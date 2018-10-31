@@ -1,0 +1,22 @@
+---
+title: "Solo 2 Prep"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+# Chapter 1 Prep
+
+```{r}
+load("stc-cbc-respondents-v3(1).RData")
+
+skimr::skim(resp.data.v3)
+```
+
+```{r}
+library(dummies)
+load("efCode.RData") 
+taskV3 <- read.csv("stc-dc-task-cbc -v3(1).csv", sep="\t")
+task.mat <- as.matrix(taskV3[, c("screen", "RAM", "processor", "price", "brand")])
+X.mat=efcode.attmat.f(task.mat) 
+```
+
