@@ -6,17 +6,55 @@ output:
 ---
 # Chapter 1 Prep
 
+There are 3 choice for 36 choice sets.Total of 108. There are 424 respondants
+
 ```{r}
 load("stc-cbc-respondents-v3(1).RData")
 
 skimr::skim(resp.data.v3)
 ```
 
+Viewing Task matrix and creating dummy variable
+
 ```{r}
 library(dummies)
 load("efCode.RData") 
 taskV3 <- read.csv("stc-dc-task-cbc -v3(1).csv", sep="\t")
+head(taskV3)
 task.mat <- as.matrix(taskV3[, c("screen", "RAM", "processor", "price", "brand")])
 X.mat=efcode.attmat.f(task.mat) 
+
+head(X.mat)
+```
+
+Create price brand interacton
+
+```{r}
+pricevec <- taskV3$price-mean(taskV3$price)
+
+# brand columns
+X.brands <- X.mat[,9:11]
+X.BrandByPrice = X.brands*pricevec 
+
+X.matrix=cbind(X.mat,X.BrandByPrice) 
+
+# Check if the data came through well
+det(t(X.matrix)%*%X.matrix)
+```
+
+```{r}
+ydata <- resp.data.v3[,4:39]
+
+# making sure we got all the 36 choice sets
+
+ydata=na.omit(ydata)
+ydata <- as.matrix(ydata)
+
+zowner <- 1 * ( ! is.na(resp.data.v3$vList3) )
+
+```
+
+```{r}
+library(bayesm)
 ```
 
