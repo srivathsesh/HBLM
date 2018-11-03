@@ -56,5 +56,62 @@ zowner <- 1 * ( ! is.na(resp.data.v3$vList3) )
 
 ```{r}
 library(bayesm)
+lgtdata = NULL 
+
+# The lgtdata is required argument for MCMC HBMNL regression where lgtdata is a list of list of length equal to # of respondents. Each list in the list contains y and the X.matrix
+for (i in 1:424) { 
+lgtdata[[i]]=list(y=ydata[i,],X=X.matrix) 
+} 
+```
+
+
+We'll try MCMC for some samples of data
+
+
+```{r}
+lgtdata100 = lgtdata[1:100]
+mcmctest = list(R=5000,keep =5)
+Data1=list(p=3,lgtdata=lgtdata100)   # p is choice set size
+
+testrun1=rhierMnlDP(Data=Data1,Mcmc=mcmctest)
+```
+
+Lets examine the output
+
+```{r}
+names(testrun1)
+
+dim(testrun1$betadraw) # first dimension is the # of respondents, the second is the # parameters (betas) and the third is the # iterations - see mcmctest variable
+```
+
+```{r}
+plot(1:length(testrun1$betadraw[1,1,]),testrun1$betadraw[1,1,])
+betadraw1 <- testrun1$betadraw
+plot(betadraw1[1,1,])
+plot(density(betadraw1[1,14,701:1000],width=2))
+
+betameans <- apply(betadraw1[,,701:1000],c(1,2),mean) 
+
+dim(betameans)
+dim(X.matrix)
+
+xbeta=X.matrix%*%t(betameans)
+
+xbeta2=matrix(xbeta,ncol=3,byrow=T)
+
+
+```
+xbeta2 is noting but the log odds of the choice sets now. We need to be converting it into probabilities
+
+```{r}
+expxbeta2=exp(xbeta2)
+
+rsumvec=rowSums(expxbeta2) 
+
+pchoicemat=expxbeta2/rsumvec 
+
+custchoice <- max.col(pchoicemat)
+
+ydata2 <- as.vector(t(ydata))[1:length(custchoice)]
 ```
 

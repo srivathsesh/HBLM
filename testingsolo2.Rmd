@@ -1,0 +1,171 @@
+---
+title: "Choice Modeling - Solo2"
+author: "Sri Seshadri"
+date: "11/2/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(dplyr)
+```
+
+# Data Set up
+
+```{r}
+load("stc-cbc-respondents-v3(1).RData")
+library(dummies)
+load("efCode.RData") 
+taskV3 <- read.csv("stc-dc-task-cbc -v3(1).csv", sep="\t")
+
+task.mat <- as.matrix(taskV3[, c("screen", "RAM", "processor", "price", "brand")])
+task.mat <- cbind(task.mat,rep(1:36,each = 3))
+task.mat <- cbind(task.mat, rep(1:3,times = 36))
+colnames(task.mat)[6] <- "choiceset"
+colnames(task.mat)[7] <- "option"
+X.mat=efcode.attmat.f(task.mat) #  I hate this, let make it better 
+
+designset <- matrix( rep( t( task.mat ) , 424 ) , ncol =  ncol(task.mat) , byrow = TRUE )
+colnames(designset) <- c(colnames(task.mat))
+expandresp <- function(choice){
+  switch (choice,
+    "1" = return(c(1,0,0)),
+    "2" = return(c(0,1,0)),
+    "3" = return(c(0,0,1))
+  )
+}
+
+stackresp <- function(rowid){
+  unlist(purrr::map(resp.data.v3[rowid,4:39],expandresp))
+}
+
+designset <- cbind(designset,unlist(purrr::map(1:424,stackresp)))
+colnames(designset)[8] <- 'choice'
+
+designset <- cbind(designset,rep(resp.data.v3$record,each = 108))
+colnames(designset)[9] <- 'Respondent'
+
+designset <- as_tibble(designset)
+  
+```
+
+# EDA
+
+```{r}
+skimr::skim(designset)
+```
+
+```{r}
+SummaryData <- designset %>% 
+  group_by(choiceset,option) %>% 
+  summarise(Counts = sum(choice)) %>% 
+  ungroup() %>% 
+  mutate(choiceset = as.factor(choiceset),
+         PrefPercent = round(Counts/424,2),
+         interested = ifelse(PrefPercent >=0.70,2,ifelse(PrefPercent <= 0.12,0,1)))
+
+lattice::barchart(option ~ Counts | choiceset , data = SummaryData)
+```
+
+## What are people liking
+
+```{r}
+taskV3$choice.set <- as.factor(taskV3$choice.set)
+SummaryData %>% 
+  filter(interested == 2) %>% 
+  arrange(desc(PrefPercent)) %>% 
+  distinct(choiceset,option) %>% 
+  dplyr::left_join(.,taskV3,by = c("choiceset" = "choice.set",
+                                   "option"= "choice.ID")) %>% 
+  mutate(LevelsTech = paste0(as.character(screen),as.character(RAM), as.character(processor)),
+         LevelsTechPrice = paste0(LevelsTech,as.character(price)),
+         LevelsTechbrand = paste0(LevelsTech,as.character(brand)))
+```
+
+Observations are:
+
+1. 16GB RAM is very popular
+2. 2.5 and 2 GHz Processor is preferred
+3. Price of $199 
+4. Higher price is paid ($299) for larger screen( upgrade from 7" to 10"; RAM being 16GB and Processor being 2 GHz)
+5. STC brand appreared in 4 of the 9 popular comninations, followed by pear (3/9)
+
+# What are people not liking
+
+```{r}
+SummaryData %>% 
+  filter(interested == 0) %>% 
+  arrange(PrefPercent) %>% 
+  distinct(choiceset,option) %>% 
+  dplyr::left_join(.,taskV3,by = c("choiceset" = "choice.set",
+                                   "option"= "choice.ID")) %>% 
+  mutate(LevelsTech = paste0(as.character(screen),as.character(RAM), as.character(processor)),
+         LevelsTechPrice = paste0(LevelsTech,as.character(price)),
+         LevelsTechbrand = paste0(LevelsTech,as.character(brand))) -> Lows
+
+ ggplot(Lows,mapping = aes(x = as.factor(processor))) + geom_bar()
+ ggplot(Lows,mapping = aes(x = as.factor(brand))) + geom_bar()
+ ggplot(Lows,mapping = aes(x = as.factor(price))) + geom_bar()
+ ggplot(Lows,mapping = aes(x = as.factor(RAM))) + geom_bar()
+ ggplot(Lows,mapping = aes(x = as.factor(LevelsTech))) + geom_bar()
+ ggplot(Lows,mapping = aes(x = as.factor(LevelsTechPrice))) + geom_bar()
+ ggplot(Lows,mapping = aes(x = as.factor(LevelsTechbrand))) + geom_bar()
+```
+
+Observations are:
+
+1. 1.5 GHz is amongst the least popular
+2. STC is NOT UNPOPULAR (wow!)
+3. 
+
+# Main effects?
+
+```{r}
+SummaryData %>% 
+  #filter(interested == 2) %>% 
+  #arrange(desc(PrefPercent)) %>% 
+  #distinct(choiceset,option) %>% 
+  dplyr::left_join(.,taskV3,by = c("choiceset" = "choice.set",
+                                   "option"= "choice.ID")) %>% 
+  mutate(LevelsTech = paste0(as.character(screen),as.character(RAM), as.character(processor)),
+         LevelsTechPrice = paste0(LevelsTech,as.character(price)),
+         LevelsTechbrand = paste0(LevelsTech,as.character(brand))) -> DOE
+
+ DOE %>% 
+  ggplot(mapping = aes(x = as.factor(screen), y = PrefPercent)) + geom_violin()
+ 
+DOE %>% 
+  ggplot(mapping = aes(x = as.factor(price), y = PrefPercent)) + geom_violin()
+DOE %>% 
+  ggplot(mapping = aes(x = as.factor(brand), y = PrefPercent)) + geom_violin()
+DOE %>% 
+  ggplot(mapping = aes(x = as.factor(RAM), y = PrefPercent)) + geom_violin()
+DOE %>% 
+  ggplot(mapping = aes(x = as.factor(processor), y = PrefPercent)) + geom_violin()
+DOE %>% 
+  ggplot(mapping = aes(x = as.factor(price*brand), y = PrefPercent)) + geom_violin()
+DOE %>% 
+  ggplot(mapping = aes(x = as.factor(paste0(as.character(price),".",as.character(brand))), y = PrefPercent)) + geom_violin()
+```
+# MCMC modeling
+
+```{r}
+# making the design parameters as factor variables
+designset %<>%
+ mutate_if(is.numeric,as.factor) 
+
+# using library(mlogit)
+library(mlogit)
+
+cbc.mlogit <- mlogit.data(data = designset, 
+                          choice = "choice",
+                          shape = "long",
+                          varying = 1:5,
+                          alt.levels = 1:3,
+                          id.var = "Respondent")
+
+m1 <- mlogit(choice ~ screen + RAM + processor + price + brand , data = cbc.mlogit)
+summary(m1)
+```
+
